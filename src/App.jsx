@@ -3,9 +3,9 @@ import axios from "axios";
 import "./assets/style.css";
 
 // API 基礎網址設定
-const API_BASE = "https://ec-course-api.hexschool.io/v2";
+const API_BASE = import.meta.env.VITE_API_URL;
 // API 路徑，需要替換成自己的路徑
-const API_PATH = "orias";
+const API_PATH = import.meta.env.VITE_API_PATH;
 
 function App() {
   // 表單資料狀態，用於存儲使用者名稱和密碼
