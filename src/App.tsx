@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, FormEvent, ChangeEvent } from "react";
 import axios from "axios";
 import "./assets/style.css";
+import { FormData, Product, ApiResponse } from './types';
 
 // API 基礎網址設定
 const API_BASE = import.meta.env.VITE_API_URL;
@@ -9,19 +10,19 @@ const API_PATH = import.meta.env.VITE_API_PATH;
 
 function App() {
   // 表單資料狀態，用於存儲使用者名稱和密碼
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     username: "",
     password: "",
   });
 
   // 管理登入狀態的 state，true 表示已登入，false 表示未登入
-  const [isAuth, setisAuth] = useState(false);
+  const [isAuth, setIsAuth] = useState<boolean>(false);
 
   // 儲存產品列表的 state，初始值為空陣列
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState<Product[]>([]);
 
   // 儲存當前選中產品詳情的 state，初始值為 null
-  const [tempProduct, setTempProduct] = useState(null);
+  const [tempProduct, setTempProduct] = useState<Product | null>(null);
 
   // 檢查使用者登入狀態的函式
   // 從 Cookie 中取得 token 並驗證其有效性
@@ -36,14 +37,18 @@ function App() {
         .find((row) => row.startsWith("hexToken="))
         ?.split("=")[1];
 
+      if (!token) {
+        throw new Error("No token found");
+      }
+
       // 2. 設定 axios 的請求標頭
       // 將 token 加入到所有 axios 請求的 Authorization 標頭中
       axios.defaults.headers.common.Authorization = token;
 
       // 3. 發送驗證請求
       // 向後端 API 發送 POST 請求來驗證 token 是否有效
-      const res = await axios.post(`${API_BASE}/api/user/check`);
-      if (res.data.success) {
+      const response = await axios.post(`${API_BASE}/api/user/check`);
+      if (response.data.success) {
         alert("目前已登入狀態");
       }
     } catch (error) {
@@ -57,38 +62,33 @@ function App() {
   // 取得產品列表的非同步函式
   const getData = async () => {
     try {
-      // 向 API 發送請求獲取產品資料
-      const response = await axios.get(
+      const response = await axios.get<ApiResponse>(
         `${API_BASE}/api/${API_PATH}/admin/products`
       );
-      // 更新產品列表狀態
-      setProducts(response.data.products);
-    } catch (err) {
-      console.error(err.response.data.message);
+      setProducts(response.data.products || []);
+    } catch (error) {
+      console.error('Error:', error);
     }
   };
 
   // 處理表單輸入變更的函式
   // 當使用者在輸入框中輸入時觸發
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
+    setFormData((prev) => ({
+      ...prev,
       [id]: value,
     }));
   };
 
   // 處理登入表單提交的非同步函式
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     // 防止表單預設提交行為
     e.preventDefault();
 
     try {
       // 向後端發送登入請求
-      const response = await axios.post(`${API_BASE}/admin/signin`, {
-        username: formData.username,
-        password: formData.password,
-      });
+      const response = await axios.post(`${API_BASE}/admin/signin`, formData);
 
       // 解構出 token 和過期時間
       const { token, expired } = response.data;
@@ -96,14 +96,16 @@ function App() {
       document.cookie = `hexToken=${token};expires=${new Date(expired)};`;
 
       // 設定 axios 的預設授權標頭
-      axios.defaults.headers.common.Authorization = `${token}`;
+      axios.defaults.headers.common.Authorization = token;
 
       // 登入成功後取得產品資料
       getData();
       // 更新登入狀態
-      setisAuth(true);
+      setIsAuth(true);
     } catch (error) {
-      alert("登入失敗: " + error.response.data.message);
+      if (axios.isAxiosError(error)) {
+        alert("登入失敗: " + error.response?.data.message);
+      }
     }
   };
 
@@ -119,23 +121,23 @@ function App() {
         
         // 如果沒有 token，設定為未登入狀態
         if (!token) {
-          setisAuth(false);
+          setIsAuth(false);
           return;
         }
 
         // 設定 axios 預設標頭
         axios.defaults.headers.common.Authorization = token;
         // 驗證 token 是否有效
-        const res = await axios.post(`${API_BASE}/api/user/check`);
+        const response = await axios.post(`${API_BASE}/api/user/check`);
         
         // 如果驗證成功，設定登入狀態並取得產品資料
-        if (res.data.success) {
-          setisAuth(true);
+        if (response.data.success) {
+          setIsAuth(true);
           getData();
         }
       } catch (error) {
         console.error('登入驗證失敗:', error);
-        setisAuth(false);
+        setIsAuth(false);
       }
     };
 
@@ -191,7 +193,7 @@ function App() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="5">尚無產品資料</td>
+                      <td colSpan={5}>尚無產品資料</td>
                     </tr>
                   )}
                 </tbody>
